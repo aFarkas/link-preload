@@ -1,9 +1,9 @@
 let iframe, iframeWindow, iframeDocument, searchIntervall, resizeListenerInstalled;
 
+const PRELOAD_ATTRIBUTE = window.preloadPolyfillAttribute || 'preload';
 const elemSymbol = window.Symbol ? Symbol('_preload') : '_preload' + (Date.now());
 const logged = {};
 const as = {};
-const preloadAttr = window.preloadPolyfillAttribute || 'preload';
 
 let supportsPreload = false;
 
@@ -52,11 +52,12 @@ function add(type, fn){
 
 function processPreload(link){
     const asAttribute = link.getAttribute('as') || '';
+    const href = link.href;
 
-    if(as[asAttribute]){
+    if(as[asAttribute] && href){
         const data = {
             as: asAttribute,
-            href: link.href,
+            href: href,
             type: link.getAttribute('type'),
             media: link.media,
             link: link,
@@ -69,22 +70,27 @@ function processPreload(link){
 
             as[asAttribute](data, function(status){
                 triggerEvent(link, status);
-            }, getIframeData);
+            }, getIframeData, link);
         } else {
             installResizeHandler();
         }
     } else if(window.console && !logged[data.as]){
+        link[elemSymbol] = true;
         logged[data.as] = true;
         console.log("don't know as: " + data.as);
     }
 }
 
-function findPreloads(){
+function run(preloadAttribute){
     let i;
 
-    if(supportsPreload && preloadAttr == 'preload'){return;}
+    if(!preloadAttribute){
+        preloadAttribute = PRELOAD_ATTRIBUTE;
+    }
 
-    const preloads = document.querySelectorAll('link[rel="'+ preloadAttr +'"]');
+    if(supportsPreload && preloadAttribute == 'preload'){return;}
+
+    const preloads = document.querySelectorAll('link[rel="'+ preloadAttribute +'"]');
 
     for(i = 0; i < preloads.length; i++){
         if(!preloads[i][elemSymbol]){
@@ -100,7 +106,7 @@ function installResizeHandler(){
     let runs;
     const runFind = ()=> {
         runs = false;
-        findPreloads();
+        run();
     };
 
     window.addEventListener('resize', function(){
@@ -109,23 +115,43 @@ function installResizeHandler(){
     }, false);
 }
 
-if(!supportsPreload || preloadAttr != 'preload'){
+if(window.HTMLLinkElement && Object.defineProperty){
+    const linkProto = window.HTMLLinkElement.prototype;
+
+    ['as', 'type'].forEach((prop)=> {
+        if(!(prop in linkProto)){
+            Object.defineProperty(linkProto, prop, {
+                enumerable: true,
+                configurable: true,
+                get: function () {
+                    return this.getAttribute(prop) || '';
+                },
+                set: function (value) {
+                    this.setAttribute(prop, value);
+                },
+            });
+        }
+    })
+}
+
+if(!supportsPreload || PRELOAD_ATTRIBUTE != 'preload'){
     if(window.MutationObserver){
-        new MutationObserver(findPreloads).observe( document.documentElement, {childList: true, subtree: true} );
+        new MutationObserver(() => { run() }).observe( document.documentElement, {childList: true, subtree: true} );
     } else {
         searchIntervall = setInterval(function(){
             if(document.readyState == 'complete'){
                 clearInterval(searchIntervall);
             }
 
-            findPreloads();
+            run();
         }, 99);
     }
 
-    setTimeout(findPreloads);
+    setTimeout(run);
 }
 
 export default {
-    add: add,
-    run: findPreloads,
+    add,
+    run,
+    supportsPreload
 };

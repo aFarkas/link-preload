@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Mocha Tests</title>
+    <script>
+        window.testData = {
+
+        };
+
+        (function(){
+        	var add = function(id){
+                if(!testData[id]){
+                    testData[id] = {success: [], error: []};
+                }
+            };
+            window.onPreloadLoad = function(element){
+                var id = element.id;
+
+                add(id);
+                testData[id].success.push(id);
+            };
+
+            window.onPreloadError = function(element){
+                var id = element.id;
+
+                add(id);
+                testData[id].error.push(id);
+            };
+        })();
+    </script>
+    <script>
+        window.preloadPolyfillClearTimeout = 1500;
+    </script>
+    <link href="test-data/style.css" id="style-before" rel="preload" as="style" onload="onPreloadLoad(this);" onerror="onPreloadError(this)" />
+    <link href="test-data/script.js" id="script-before" rel="preload" as="script" onload="onPreloadLoad(this);" onerror="onPreloadError(this)" />
+    <link href="test-data/fetch.json" id="-before" rel="preload" as="" onload="onPreloadLoad(this);" onerror="onPreloadError(this)" />
+    <link href="test-data/font.woff" id="font-before" type="font/woff" rel="preload" as="font" onload="onPreloadLoad(this);" onerror="onPreloadError(this)" />
+
+    <script src="../index.js" async=""></script>
+    <link rel="stylesheet" href="../node_modules/mocha/mocha.css" />
+
+    <link href="test-data/style.css" id="style-after" rel="preload" as="style" onload="onPreloadLoad(this);" onerror="onPreloadError(this)" />
+    <link href="test-data/script.js" id="script-after" rel="preload" as="script" onload="onPreloadLoad(this);" onerror="onPreloadError(this)" />
+    <link href="test-data/fetch.json" id="-after" rel="preload" onload="onPreloadLoad(this);" onerror="onPreloadError(this)" />
+    <link href="test-data/font.woff" id="font-after" type="font/woff" rel="preload" as="font" onload="onPreloadLoad(this);" onerror="onPreloadError(this)" />
+
+    <link href="test-data/styleerror.css" id="style-error" rel="preload" as="style" onload="onPreloadLoad(this);" onerror="onPreloadError(this)" />
+    <link href="test-data/scripterror.js" id="script-error" rel="preload" as="script" onload="onPreloadLoad(this);" onerror="onPreloadError(this)" />
+    <link href="test-data/fetcherror.json" id="-error" rel="preload" onload="onPreloadLoad(this);" onerror="onPreloadError(this)" />
+    <link href="test-data/fonterror.woff" id="font-error" type="font/woff" rel="preload" as="font" onload="onPreloadLoad(this);" onerror="onPreloadError(this)" />
+</head>
+<body>
+<div id="mocha"></div>
+<script src="../node_modules/mocha/mocha.js"></script>
+<script src="../node_modules/chai/chai.js"></script>
+<script src="../node_modules/sinon/pkg/sinon.js"></script>
+<script>
+mocha.setup({
+    ui: 'bdd',
+    asyncOnly: true,
+    globals: 'linkPreloadPolyfill',
+});
+</script>
+
+<script src="test.js"></script>
+<script>
+    mocha.checkLeaks();
+    if (window.mochaPhantomJS) mochaPhantomJS.run();
+    else mocha.run();
+</script>
+</body>
+</html>

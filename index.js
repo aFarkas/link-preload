@@ -32,16 +32,21 @@ var _core2 = _interopRequireDefault(_core);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-_core2.default.add('', function (link, callback) {
+_core2.default.add('', function (link, callback, _getIframeData, linkElement) {
     try {
         var request = new XMLHttpRequest();
 
-        request.addEventListener('load', function () {
-            callback('load');
+        request.addEventListener('load', function (e) {
+            var status = request.status;
+            var isSuccess = status >= 200 && status < 300 || status == 304;
+
+            callback(isSuccess ? 'load' : 'error');
+            request = null;
         });
 
         request.addEventListener('error', function () {
             callback('error');
+            request = null;
         });
 
         request.open('GET', link.href, true);
@@ -65,7 +70,7 @@ var _timer2 = _interopRequireDefault(_timer);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-var COMPAREFONT = 'Comic Sans MS';
+var COMPARE_FONT = 'Comic Sans MS';
 
 var id = Date.now();
 
@@ -104,8 +109,8 @@ var loadFont = window.FontFace && !window.preloadPolyfillNoFontFaceLoader ? func
 
     spans = div.querySelectorAll('span');
 
-    spans[0].style.fontFamily = name + ', ' + COMPAREFONT;
-    spans[1].style.fontFamily = COMPAREFONT;
+    spans[0].style.fontFamily = name + ', ' + COMPARE_FONT;
+    spans[1].style.fontFamily = COMPARE_FONT;
 
     iframeDocument.documentElement.appendChild(div);
 
@@ -234,10 +239,10 @@ var iframe = void 0,
     searchIntervall = void 0,
     resizeListenerInstalled = void 0;
 
+var PRELOAD_ATTRIBUTE = window.preloadPolyfillAttribute || 'preload';
 var elemSymbol = window.Symbol ? Symbol('_preload') : '_preload' + Date.now();
 var logged = {};
 var as = {};
-var preloadAttr = window.preloadPolyfillAttribute || 'preload';
 
 var supportsPreload = false;
 
@@ -286,11 +291,12 @@ function add(type, fn) {
 
 function processPreload(link) {
     var asAttribute = link.getAttribute('as') || '';
+    var href = link.href;
 
-    if (as[asAttribute]) {
+    if (as[asAttribute] && href) {
         var _data = {
             as: asAttribute,
-            href: link.href,
+            href: href,
             type: link.getAttribute('type'),
             media: link.media,
             link: link
@@ -303,24 +309,29 @@ function processPreload(link) {
 
             as[asAttribute](_data, function (status) {
                 triggerEvent(link, status);
-            }, getIframeData);
+            }, getIframeData, link);
         } else {
             installResizeHandler();
         }
     } else if (window.console && !logged[data.as]) {
+        link[elemSymbol] = true;
         logged[data.as] = true;
         console.log("don't know as: " + data.as);
     }
 }
 
-function findPreloads() {
+function run(preloadAttribute) {
     var i = void 0;
 
-    if (supportsPreload && preloadAttr == 'preload') {
+    if (!preloadAttribute) {
+        preloadAttribute = PRELOAD_ATTRIBUTE;
+    }
+
+    if (supportsPreload && preloadAttribute == 'preload') {
         return;
     }
 
-    var preloads = document.querySelectorAll('link[rel="' + preloadAttr + '"]');
+    var preloads = document.querySelectorAll('link[rel="' + preloadAttribute + '"]');
 
     for (i = 0; i < preloads.length; i++) {
         if (!preloads[i][elemSymbol]) {
@@ -338,7 +349,7 @@ function installResizeHandler() {
     var runs = void 0;
     var runFind = function runFind() {
         runs = false;
-        findPreloads();
+        run();
     };
 
     window.addEventListener('resize', function () {
@@ -349,25 +360,49 @@ function installResizeHandler() {
     }, false);
 }
 
-if (!supportsPreload || preloadAttr != 'preload') {
+if (window.HTMLLinkElement && Object.defineProperty) {
+    (function () {
+        var linkProto = window.HTMLLinkElement.prototype;
+
+        ['as', 'type'].forEach(function (prop) {
+            if (!(prop in linkProto)) {
+                Object.defineProperty(linkProto, prop, {
+                    enumerable: true,
+                    configurable: true,
+                    get: function get() {
+                        return this.getAttribute(prop) || '';
+                    },
+                    set: function set(value) {
+                        this.setAttribute(prop, value);
+                    }
+                });
+            }
+        });
+    })();
+}
+
+if (!supportsPreload || PRELOAD_ATTRIBUTE != 'preload') {
     if (window.MutationObserver) {
-        new MutationObserver(findPreloads).observe(document.documentElement, { childList: true, subtree: true });
+        new MutationObserver(function () {
+            run();
+        }).observe(document.documentElement, { childList: true, subtree: true });
     } else {
         searchIntervall = setInterval(function () {
             if (document.readyState == 'complete') {
                 clearInterval(searchIntervall);
             }
 
-            findPreloads();
+            run();
         }, 99);
     }
 
-    setTimeout(findPreloads);
+    setTimeout(run);
 }
 
 exports.default = {
     add: add,
-    run: findPreloads
+    run: run,
+    supportsPreload: supportsPreload
 };
 
 },{}],7:[function(require,module,exports){
@@ -379,7 +414,7 @@ Object.defineProperty(exports, "__esModule", {
 
 exports.default = function (run, onTimeout) {
     var intervall = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 33;
-    var clearTimeout = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 9999;
+    var clearTimeout = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : window.preloadPolyfillClearTimeout || 9999;
 
     var aborted = false;
     var now = Date.now();

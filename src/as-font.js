@@ -1,7 +1,7 @@
 import linkPreload from './core';
 import maxIntervalTimer from './utils/timer';
 
-const COMPAREFONT = 'Comic Sans MS';
+const COMPARE_FONT = 'Comic Sans MS';
 
 let id = Date.now();
 
@@ -45,8 +45,8 @@ const loadFont = (window.FontFace && !window.preloadPolyfillNoFontFaceLoader) ?
 
         spans = div.querySelectorAll('span');
 
-        spans[0].style.fontFamily = name + ', '+ COMPAREFONT;
-        spans[1].style.fontFamily = COMPAREFONT;
+        spans[0].style.fontFamily = name + ', '+ COMPARE_FONT;
+        spans[1].style.fontFamily = COMPARE_FONT;
 
         iframeDocument.documentElement.appendChild(div);
 

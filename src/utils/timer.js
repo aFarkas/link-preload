@@ -1,4 +1,4 @@
-export default function(run, onTimeout, intervall = 33, clearTimeout = 9999){
+export default function(run, onTimeout, intervall = 33, clearTimeout = (window.preloadPolyfillClearTimeout || 9999)){
     let aborted = false;
     const now = Date.now();
     const timer = setInterval(function(){
