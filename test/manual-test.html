@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+
+    <!-- we use 'preload_' instead of 'preload' to make it testable in chrome -->
+    <link rel="preload_" onload="console.log(this, 'script');" href="http://code.jquery.com/jquery-1.12.1.js" as="script" />
+    <link rel="preload_" onload="console.log(this, 'style');" href="https://cdn.jsdelivr.net/bootstrap/3.3.6/css/bootstrap.min.css" as="style" />
+
+    <link rel="preload_" onload="console.log(this, 'font');" onerror="console.log(this, 'font', 'error');" href="LatoLatin-Regular.woff" as="font" type="font/woff" crossorigin="" />
+
+    <script>
+        window.preloadPolyfillAttribute = 'preload_';
+    </script>
+    <script src="../index.js"></script>
+
+
+</head>
+<body>
+</body>
+</html>

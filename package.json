@@ -1,0 +1,39 @@
+{
+  "name": "link-preload",
+  "version": "0.1.0",
+  "description": "link[rel=preload] polyfill. Supports preloading styles, fonts, scripts and XHR/fetch data/assets.",
+  "main": "index.js",
+  "scripts": {
+    "build": "browserify src/_common.js --standalone linkPreloadPolyfill --transform babelify -o index.js",
+    "test": "mocha-phantomjs test/index.html"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aFarkas/link-preload.git"
+  },
+  "keywords": [
+    "polyfill",
+    "preload",
+    "fonts",
+    "async",
+    "css"
+  ],
+  "author": "Alexander Farkas",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/aFarkas/link-preload/issues"
+  },
+  "homepage": "https://github.com/aFarkas/link-preload#readme",
+  "devDependencies": {
+    "babel-cli": "^6.18.0",
+    "babel-preset-latest": "^6.16.0",
+    "babelify": "^7.3.0",
+    "browserify": "^13.1.1",
+    "chai": "^3.5.0",
+    "eslint": "^3.11.0",
+    "mocha": "^3.1.2",
+    "mocha-phantomjs": "^4.1.0",
+    "rollupify": "^0.3.5",
+    "sinon": "^1.17.6"
+  }
+}
