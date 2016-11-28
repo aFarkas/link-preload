@@ -1,11 +1,12 @@
 import linkPreload from './core';
 import maxIntervalTimer from './utils/timer';
 
-linkPreload.add('style', function(link, callback, getIframeData){
+linkPreload.add('style', function(link, getIframeData){
     let stopTimer;
 
-    const sheets = document.styleSheets;
+    const deferred = linkPreload.deferred();
     const {iframeDocument} = getIframeData();
+    const sheets = iframeDocument.styleSheets;
     const preload = iframeDocument.createElement('link');
 
     const clear = () => {
@@ -17,15 +18,15 @@ linkPreload.add('style', function(link, callback, getIframeData){
 
     const onload = () => {
         clear();
-        callback('load');
+        deferred.resolve('load');
     };
 
-    preload.href = link.href;
-    preload.rel = 'stylesheet';
+    const onerror = () => {
+        clear();
+        deferred.resolve('error');
+    };
 
-    iframeDocument.documentElement.appendChild(preload);
-
-    stopTimer = maxIntervalTimer(function(){
+    const detectCssChange = ()=>{
         const resolvedHref = preload.href;
 
         let i = sheets.length;
@@ -36,16 +37,21 @@ linkPreload.add('style', function(link, callback, getIframeData){
                 break;
             }
         }
+    };
 
-    }, () => {
+    preload.href = link.href;
+    preload.rel = 'stylesheet';
+
+    iframeDocument.documentElement.appendChild(preload);
+
+    stopTimer = maxIntervalTimer(detectCssChange, () => {
         clear();
-        callback('timeout');
+        deferred.resolve('timeout');
     });
 
-    preload.onload = onload;
+    preload.onload = detectCssChange;
 
-    preload.onerror = () => {
-        clear();
-        callback('error');
-    };
+    preload.onerror = onerror;
+
+    return deferred;
 });

@@ -4,12 +4,23 @@ const PRELOAD_ATTRIBUTE = window.preloadPolyfillAttribute || 'preload';
 const elemSymbol = window.Symbol ? Symbol('_preload') : '_preload' + (Date.now());
 const logged = {};
 const as = {};
+const deferreds = {};
+const async = window.Promise ?
+    Promise.resolve() :
+    {
+        then: (fn) => {
+            setTimeout(fn);
+        },
+    }
+;
 
 let supportsPreload = false;
 
 try {
     supportsPreload = document.createElement('link').relList.supports('preload');
-} catch(e){}
+} catch(e){
+    //false
+}
 
 function createIframe() {
     if(!iframe){
@@ -19,7 +30,7 @@ function createIframe() {
         iframe.style.visibility = 'hidden';
         iframe.style.position = 'absolute';
         iframe.style.top = '-9999px';
-        iframe.src = 'javascript:false';
+        iframe.src = 'javascript:false'; //eslint-disable-line no-script-url
         iframe.allowTransparency = true;
         (document.body || document.documentElement).appendChild(iframe);
         iframeWindow = iframe.contentWindow || iframe.contentDocument;
@@ -51,7 +62,11 @@ function add(type, fn){
 }
 
 function processPreload(link){
-    const asAttribute = link.getAttribute('as') || '';
+    const dataAsAttribute = link.getAttribute('data-as');
+    const asAttribute = dataAsAttribute == null ?
+        link.getAttribute('as') || '' :
+        dataAsAttribute
+    ;
     const href = link.href;
 
     if(as[asAttribute] && href){
@@ -64,20 +79,23 @@ function processPreload(link){
         };
 
         if((!link.media || matchMedia(link.media).matches)){
-            createIframe();
-
+            const id = `${asAttribute} ${href}`;
             link[elemSymbol] = true;
 
-            as[asAttribute](data, function(status){
+            if(!deferreds[id]){
+                deferreds[id] = as[asAttribute](data, getIframeData, link);
+            }
+
+            deferreds[id].then((status)=>{
                 triggerEvent(link, status);
-            }, getIframeData, link);
+            });
         } else {
             installResizeHandler();
         }
-    } else if(window.console && !logged[data.as]){
+    } else if(window.console && !logged[asAttribute]){
         link[elemSymbol] = true;
-        logged[data.as] = true;
-        console.log("don't know as: " + data.as);
+        logged[asAttribute] = true;
+        console.log(`don't know as: ${asAttribute}`); //eslint-disable-line no-console
     }
 }
 
@@ -131,12 +149,14 @@ if(window.HTMLLinkElement && Object.defineProperty){
                 },
             });
         }
-    })
+    });
 }
 
 if(!supportsPreload || PRELOAD_ATTRIBUTE != 'preload'){
     if(window.MutationObserver){
-        new MutationObserver(() => { run() }).observe( document.documentElement, {childList: true, subtree: true} );
+        new MutationObserver(() => { run(); })
+            .observe( document.documentElement, {childList: true, subtree: true} )
+        ;
     } else {
         searchIntervall = setInterval(function(){
             if(document.readyState == 'complete'){
@@ -150,8 +170,43 @@ if(!supportsPreload || PRELOAD_ATTRIBUTE != 'preload'){
     setTimeout(run);
 }
 
+function deferred(){
+    let result;
+    let fns = [];
+    const promiseLike = {
+        resolve: (_result) => {
+            if(fns){
+                let runFns = fns;
+                result = _result;
+                fns = null;
+                async.then(()=>{
+                    runFns.forEach((fn)=>{
+                        fn(result);
+                    });
+                });
+            }
+            return promiseLike;
+        },
+        then: (fn)=> {
+            if(fns){
+                fns.push(fn);
+            } else {
+                async.then(()=>{
+                    fn(result);
+                });
+            }
+            return promiseLike;
+        },
+    };
+
+    return promiseLike;
+
+}
+
 export default {
     add,
     run,
-    supportsPreload
+    supportsPreload,
+    deferred,
+    as,
 };

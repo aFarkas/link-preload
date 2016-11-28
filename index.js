@@ -32,29 +32,35 @@ var _core2 = _interopRequireDefault(_core);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-_core2.default.add('', function (link, callback, _getIframeData, linkElement) {
+_core2.default.add('', function (linkData) {
+    var deferred = _core2.default.deferred();
+
     try {
-        var request = new XMLHttpRequest();
+        (function () {
+            var request = new XMLHttpRequest();
 
-        request.addEventListener('load', function (e) {
-            var status = request.status;
-            var isSuccess = status >= 200 && status < 300 || status == 304;
+            request.addEventListener('load', function () {
+                var status = request.status;
+                var isSuccess = status >= 200 && status < 300 || status == 304;
 
-            callback(isSuccess ? 'load' : 'error');
-            request = null;
-        });
+                deferred.resolve(isSuccess ? 'load' : 'error');
+                request = null;
+            });
 
-        request.addEventListener('error', function () {
-            callback('error');
-            request = null;
-        });
+            request.addEventListener('error', function () {
+                deferred.resolve('error');
+                request = null;
+            });
 
-        request.open('GET', link.href, true);
+            request.open('GET', linkData.href, true);
 
-        request.send(null);
+            request.send(null);
+        })();
     } catch (er) {
-        callback(er);
+        deferred.resolve(er);
     }
+
+    return deferred;
 });
 
 },{"./core":6}],3:[function(require,module,exports){
@@ -74,29 +80,37 @@ var COMPARE_FONT = 'Comic Sans MS';
 
 var id = Date.now();
 
-var loadFont = window.FontFace && !window.preloadPolyfillNoFontFaceLoader ? function (iframeData, name, src, onLoad, onError) {
+var supportsFontFace = window.FontFace && !window.preloadPolyfillNoFontFaceLoader;
+
+var loadFont = supportsFontFace ? function (iframeData, name, src, deferred) {
     var iframeWindow = iframeData.iframeWindow;
 
     var font = new iframeWindow.FontFace(name, src, {});
 
-    font.load().then(onLoad)['catch'](onError);
+    font.load().then(function () {
+        deferred.resolve('load');
+    })['catch'](function () {
+        deferred.resolve('error');
+    });
 
-    // if font.status == 'error' it is probably not supported type and no network error
-} : function (iframeData, name, src, onLoad, onError) {
+    if (font.status == 'error') {
+        deferred.resolve('notsupported');
+    }
+} : function (iframeData, name, src, deferred, _text) {
     var spans = void 0,
         stopTimer = void 0;
     var iframeDocument = iframeData.iframeDocument;
 
     var div = iframeDocument.createElement('div');
-    var markup = '<span style="float:left;font-weight:400;font-style:normal;font-size:99px;">QW@HhsXJ</span>';
+    var markup = '<div style="min-width:1000px;width:100%;"><span style="float:left;font-weight:400;font-style:normal;font-size:99px;">' + _text + '</span></div>';
 
     var cleanup = function cleanup(status) {
         stopTimer();
 
         if (status == 'load') {
-            onLoad();
+            deferred.resolve('load');
         } else {
-            onError();
+            deferred.resolve('timeout');
         }
 
         iframeDocument.documentElement.removeChild(div);
@@ -121,18 +135,22 @@ var loadFont = window.FontFace && !window.preloadPolyfillNoFontFaceLoader ? func
     }, cleanup);
 };
 
-_core2.default.add('font', function (link, callback, getIframeData) {
+_core2.default.add('font', function (linkData, getIframeData, linkElement) {
     var fontName = 'font' + id;
     var iframeData = getIframeData();
-    var src = 'url("' + link.href + '") ' + (link.type ? ' format("' + (link.type.split('/')[1] || link.type) + '")' : '');
+    var deferred = _core2.default.deferred();
+    var text = linkElement.getAttribute('data-text') || 'QW@HhsXJ';
+    var src = 'url("' + linkData.href + '") ' + (linkData.type ? ' format("' + (linkData.type.split('/')[1] || linkData.type) + '")' : '');
 
-    loadFont(iframeData, fontName, src, function () {
-        callback('load');
-    }, function () {
-        callback('timeoutNotSupportNetworkError');
-    });
+    loadFont(iframeData, fontName, src, deferred, text);
 
     id++;
+
+    return deferred;
+});
+
+_core2.default.add('font-fetch', function (linkData, getIframeData, linkElement) {
+    return supportsFontFace || !_core2.default.as[''] ? _core2.default.as.font(linkData, getIframeData, linkElement) : _core2.default.as[''](linkData, getIframeData, linkElement);
 });
 
 },{"./core":6,"./utils/timer":7}],4:[function(require,module,exports){
@@ -144,23 +162,36 @@ var _core2 = _interopRequireDefault(_core);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-_core2.default.add('script', function (link, callback, getIframeData) {
+_core2.default.add('script', function (linkData, getIframeData) {
     var _getIframeData = getIframeData(),
         iframeDocument = _getIframeData.iframeDocument;
 
     var script = iframeDocument.createElement('script');
+    var deferred = _core2.default.deferred();
+
     var stop = function stop(status) {
-        callback(status);
+        deferred.resolve(status);
         iframeDocument.documentElement.removeChild(script);
     };
-    script.src = link.href;
+
+    script.src = linkData.href;
+
     iframeDocument.documentElement.appendChild(script);
+
+    script.onreadystatechange = function () {
+        if (script.readyState == 'complete') {
+            stop('load');
+        }
+    };
+
     script.onload = function () {
         stop('load');
     };
     script.onerror = function () {
         stop('error');
     };
+
+    return deferred;
 });
 
 },{"./core":6}],5:[function(require,module,exports){
@@ -176,14 +207,15 @@ var _timer2 = _interopRequireDefault(_timer);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-_core2.default.add('style', function (link, callback, getIframeData) {
+_core2.default.add('style', function (link, getIframeData) {
     var stopTimer = void 0;
 
-    var sheets = document.styleSheets;
+    var deferred = _core2.default.deferred();
 
     var _getIframeData = getIframeData(),
         iframeDocument = _getIframeData.iframeDocument;
 
+    var sheets = iframeDocument.styleSheets;
     var preload = iframeDocument.createElement('link');
 
     var clear = function clear() {
@@ -195,15 +227,15 @@ _core2.default.add('style', function (link, callback, getIframeData) {
 
     var onload = function onload() {
         clear();
-        callback('load');
+        deferred.resolve('load');
     };
 
-    preload.href = link.href;
-    preload.rel = 'stylesheet';
+    var onerror = function onerror() {
+        clear();
+        deferred.resolve('error');
+    };
 
-    iframeDocument.documentElement.appendChild(preload);
-
-    stopTimer = (0, _timer2.default)(function () {
+    var detectCssChange = function detectCssChange() {
         var resolvedHref = preload.href;
 
         var i = sheets.length;
@@ -214,17 +246,23 @@ _core2.default.add('style', function (link, callback, getIframeData) {
                 break;
             }
         }
-    }, function () {
+    };
+
+    preload.href = link.href;
+    preload.rel = 'stylesheet';
+
+    iframeDocument.documentElement.appendChild(preload);
+
+    stopTimer = (0, _timer2.default)(detectCssChange, function () {
         clear();
-        callback('timeout');
+        deferred.resolve('timeout');
     });
 
-    preload.onload = onload;
+    preload.onload = detectCssChange;
 
-    preload.onerror = function () {
-        clear();
-        callback('error');
-    };
+    preload.onerror = onerror;
+
+    return deferred;
 });
 
 },{"./core":6,"./utils/timer":7}],6:[function(require,module,exports){
@@ -243,6 +281,12 @@ var PRELOAD_ATTRIBUTE = window.preloadPolyfillAttribute || 'preload';
 var elemSymbol = window.Symbol ? Symbol('_preload') : '_preload' + Date.now();
 var logged = {};
 var as = {};
+var deferreds = {};
+var async = window.Promise ? Promise.resolve() : {
+    then: function then(fn) {
+        setTimeout(fn);
+    }
+};
 
 var supportsPreload = false;
 
@@ -290,7 +334,8 @@ function add(type, fn) {
 }
 
 function processPreload(link) {
-    var asAttribute = link.getAttribute('as') || '';
+    var dataAsAttribute = link.getAttribute('data-as');
+    var asAttribute = dataAsAttribute == null ? link.getAttribute('as') || '' : dataAsAttribute;
     var href = link.href;
 
     if (as[asAttribute] && href) {
@@ -303,13 +348,16 @@ function processPreload(link) {
         };
 
         if (!link.media || matchMedia(link.media).matches) {
-            createIframe();
-
+            var id = asAttribute + ' ' + href;
             link[elemSymbol] = true;
 
-            as[asAttribute](_data, function (status) {
+            if (!deferreds[id]) {
+                deferreds[id] = as[asAttribute](_data, getIframeData, link);
+            }
+
+            deferreds[id].then(function (status) {
                 triggerEvent(link, status);
-            }, getIframeData, link);
+            });
         } else {
             installResizeHandler();
         }
@@ -399,10 +447,46 @@ if (!supportsPreload || PRELOAD_ATTRIBUTE != 'preload') {
     setTimeout(run);
 }
 
+function deferred() {
+    var result = void 0;
+    var fns = [];
+    var promiseLike = {
+        resolve: function resolve(_result) {
+            if (fns) {
+                (function () {
+                    var runFns = fns;
+                    result = _result;
+                    fns = null;
+                    async.then(function () {
+                        runFns.forEach(function (fn) {
+                            fn(result);
+                        });
+                    });
+                })();
+            }
+            return promiseLike;
+        },
+        then: function then(fn) {
+            if (fns) {
+                fns.push(fn);
+            } else {
+                async.then(function () {
+                    fn(result);
+                });
+            }
+            return promiseLike;
+        }
+    };
+
+    return promiseLike;
+}
+
 exports.default = {
     add: add,
     run: run,
-    supportsPreload: supportsPreload
+    supportsPreload: supportsPreload,
+    deferred: deferred,
+    as: as
 };
 
 },{}],7:[function(require,module,exports){

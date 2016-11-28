@@ -5,28 +5,38 @@ const COMPARE_FONT = 'Comic Sans MS';
 
 let id = Date.now();
 
-const loadFont = (window.FontFace && !window.preloadPolyfillNoFontFaceLoader) ?
-    (iframeData, name, src, onLoad, onError) => {
+const supportsFontFace = (window.FontFace && !window.preloadPolyfillNoFontFaceLoader);
+
+const loadFont = supportsFontFace ?
+    (iframeData, name, src, deferred) => {
         const {iframeWindow} = iframeData;
         const font = new iframeWindow.FontFace(name, src, {});
 
-        font.load().then(onLoad)['catch'](onError);
+        font.load()
+            .then(()=>{
+                deferred.resolve('load');
+            })['catch'](()=>{
+                deferred.resolve('error');
+            })
+        ;
 
-        // if font.status == 'error' it is probably not supported type and no network error
+        if(font.status == 'error'){
+            deferred.resolve('notsupported');
+        }
     } :
-    (iframeData, name, src, onLoad, onError) => {
+    (iframeData, name, src, deferred, _text) => {
         let spans, stopTimer;
         const {iframeDocument} = iframeData;
         const div = iframeDocument.createElement('div');
-        let markup = '<span style="float:left;font-weight:400;font-style:normal;font-size:99px;">QW@HhsXJ</span>';
+        let markup = `<div style="min-width:1000px;width:100%;"><span style="float:left;font-weight:400;font-style:normal;font-size:99px;">${_text}</span></div>`;
 
         const cleanup = (status)=>{
             stopTimer();
 
             if(status == 'load'){
-                onLoad();
+                deferred.resolve('load');
             } else {
-                onError();
+                deferred.resolve('timeout');
             }
 
             iframeDocument.documentElement.removeChild(div);
@@ -58,19 +68,23 @@ const loadFont = (window.FontFace && !window.preloadPolyfillNoFontFaceLoader) ?
     }
 ;
 
-linkPreload.add('font', function(link, callback, getIframeData){
+linkPreload.add('font', function(linkData, getIframeData, linkElement){
     const fontName = 'font' + id;
     const iframeData = getIframeData();
-    const src = `url("${link.href}") ${(link.type ? ' format("'+ (link.type.split('/')[1] || link.type) +'")' : '')}`;
+    const deferred = linkPreload.deferred();
+    const text = linkElement.getAttribute('data-text') || 'QW@HhsXJ';
+    const src = `url("${linkData.href}") ${(linkData.type ? ' format("'+ (linkData.type.split('/')[1] || linkData.type) +'")' : '')}`;
 
-    loadFont(iframeData, fontName, src,
-        ()=> {
-            callback('load');
-        },
-        ()=> {
-            callback('timeoutNotSupportNetworkError');
-        }
-    );
+    loadFont(iframeData, fontName, src, deferred, text);
 
     id++;
+
+    return deferred;
+});
+
+linkPreload.add('font-fetch', function(linkData, getIframeData, linkElement){
+    return supportsFontFace || !linkPreload.as[''] ?
+        linkPreload.as.font(linkData, getIframeData, linkElement) :
+        linkPreload.as[''](linkData, getIframeData, linkElement)
+    ;
 });

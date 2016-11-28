@@ -1,14 +1,25 @@
 import linkPreload from './core';
 
-linkPreload.add('script', function(link, callback, getIframeData){
+linkPreload.add('script', function(linkData, getIframeData){
     const {iframeDocument} = getIframeData();
     const script = iframeDocument.createElement('script');
+    const deferred = linkPreload.deferred();
+
     const stop = status => {
-        callback(status);
+        deferred.resolve(status);
         iframeDocument.documentElement.removeChild(script);
     };
-    script.src = link.href;
+
+    script.src = linkData.href;
+
     iframeDocument.documentElement.appendChild(script);
+
+    script.onreadystatechange = () => {
+        if(script.readyState == 'complete'){
+            stop('load');
+        }
+    };
+
     script.onload = () => {
         stop('load');
 
@@ -16,4 +27,6 @@ linkPreload.add('script', function(link, callback, getIframeData){
     script.onerror = () => {
         stop('error');
     };
+
+    return deferred;
 });

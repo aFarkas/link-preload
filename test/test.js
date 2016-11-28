@@ -17,19 +17,21 @@ describe('link[preload] initial loads/errors', function() {
             });
         });
 
-        it('should load ' + name + ' initially and with error', function(done){
-            var testName = name + '-error';
+        if(name != 'style'){
+            it('should load ' + name + ' initially and with error', function(done){
+                var testName = name + '-error';
 
-            var timer = setInterval(function(){
-                if(window.testData[testName]){
-                    clearInterval(timer);
+                var timer = setInterval(function(){
+                    if(window.testData[testName]){
+                        clearInterval(timer);
 
-                    expect(window.testData[testName].success.length).to.equals(0);
-                    expect(window.testData[testName].error.length).to.equals(1);
-                    done();
-                }
-            }, 22);
-        });
+                        expect(window.testData[testName].success.length).to.equals(0);
+                        expect(window.testData[testName].error.length).to.equals(1);
+                        done();
+                    }
+                }, 22);
+            });
+        }
     });
 });
 

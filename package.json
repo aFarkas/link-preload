@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "browserify src/_common.js --standalone linkPreloadPolyfill --transform babelify -o index.js",
-    "test": "mocha-phantomjs test/index.html"
+    "test": "node node_modules/eslint/bin/eslint.js src/**"
   },
   "repository": {
     "type": "git",
